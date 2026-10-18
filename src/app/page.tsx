@@ -1,69 +1,174 @@
-import Image from "next/image";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { Pagination } from "@/components/pagination";
+import { ProductCard } from "@/components/product-card";
+import { ShopShell } from "@/components/shop-shell";
+import { getCategoriesWithCounts, getProductList } from "@/lib/products";
+import { buildProductListHref } from "@/lib/url";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Mini Mall — 精选好物",
+  description: "浏览全部商品，按名称或描述搜索，并按分类筛选。",
+};
+
+type HomePageProps = {
+  searchParams: Promise<{
+    search?: string | string[];
+    category?: string | string[];
+    page?: string | string[];
+  }>;
+};
+
+function first(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+  return value ?? "";
+}
+
+export default async function HomePage({ searchParams }: HomePageProps) {
+  const params = await searchParams;
+  const search = first(params.search).trim();
+  const category = first(params.category).trim();
+  const pageValue = Number.parseInt(first(params.page), 10);
+  const page = Number.isFinite(pageValue) && pageValue > 0 ? pageValue : 1;
+
+  const [list, categories] = await Promise.all([
+    getProductList({ search, category, page }),
+    getCategoriesWithCounts(),
+  ]);
+
+  const totalProducts = categories.reduce(
+    (sum, item) => sum + item.productCount,
+    0,
+  );
+  const activeCategoryName = categories.find((item) => item.slug === category)?.name;
+
+  const tabClass = (active: boolean) =>
+    active
+      ? "inline-flex items-center gap-2 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white"
+      : "inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm text-zinc-700 transition hover:border-emerald-300 hover:text-emerald-700";
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
+    <ShopShell>
+      <main className="mx-auto max-w-6xl px-4 py-8">
+        {/* 搜索与主要入口 */}
+        <section className="rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 px-6 py-10 text-white sm:px-10">
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+            发现今天的好物
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="mt-2 max-w-xl text-sm text-emerald-50 sm:text-base">
+            浏览全部商品，或按名称、描述搜索。满 ¥99 包邮。
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          <form
+            action="/"
+            method="get"
+            className="mt-6 flex max-w-xl flex-col gap-2 sm:flex-row"
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+            {category ? (
+              <input type="hidden" name="category" value={category} />
+            ) : null}
+            <input
+              type="search"
+              name="search"
+              defaultValue={search}
+              placeholder="搜索商品名称或描述"
+              className="h-11 flex-1 rounded-xl border border-white/20 bg-white/95 px-4 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:ring-2 focus:ring-white/60"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+            <button
+              type="submit"
+              className="h-11 rounded-xl bg-zinc-900 px-6 text-sm font-medium text-white transition hover:bg-zinc-800"
+            >
+              搜索
+            </button>
+          </form>
+        </section>
+
+        {/* 分类标签 */}
+        <section className="mt-8">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={buildProductListHref({ search })}
+              className={tabClass(!category)}
+            >
+              全部
+              <span
+                className={
+                  !category ? "text-xs text-emerald-100" : "text-xs text-zinc-400"
+                }
+              >
+                {totalProducts}
+              </span>
+            </Link>
+            {categories.map((item) => (
+              <Link
+                key={item.id}
+                href={buildProductListHref({ search, category: item.slug })}
+                className={tabClass(category === item.slug)}
+              >
+                {item.name}
+                <span
+                  className={
+                    category === item.slug
+                      ? "text-xs text-emerald-100"
+                      : "text-xs text-zinc-400"
+                  }
+                >
+                  {item.productCount}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* 商品网格 */}
+        <section className="mt-6">
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <p className="text-sm text-zinc-600">
+              {search
+                ? `“${search}” 的搜索结果`
+                : (activeCategoryName ?? "全部商品")}
+              <span className="ml-2 text-zinc-400">共 {list.total} 件</span>
+            </p>
+            {search || category || list.page > 1 ? (
+              <Link
+                href="/"
+                className="shrink-0 text-sm text-emerald-700 hover:underline"
+              >
+                清除筛选
+              </Link>
+            ) : null}
+          </div>
+
+          {list.products.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-20 text-center">
+              <p className="text-lg font-medium text-zinc-900">没有找到匹配的商品</p>
+              <p className="mt-1 text-sm text-zinc-500">试试其他关键词或分类。</p>
+              <Link
+                href="/"
+                className="mt-4 inline-block rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white transition hover:bg-emerald-700"
+              >
+                查看全部商品
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {list.products.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
+
+          <Pagination
+            page={list.page}
+            totalPages={list.totalPages}
+            search={search}
+            category={category}
+          />
+        </section>
       </main>
-    </div>
+    </ShopShell>
   );
 }

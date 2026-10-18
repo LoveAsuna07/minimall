@@ -45,26 +45,36 @@ src/
   app/                   # 路由（App Router）
     layout.tsx           # Header（登录态、购物车数量）/ Footer
     page.tsx             # 首页
-    products/            # 列表、搜索、分类筛选、分页、详情
+    products/[id]/       # 商品详情、加入购物车
     login/ register/     # 认证页
     cart/ checkout/      # 购物车、结算
     orders/              # 用户订单列表/详情
-    admin/               # 后台：商品、分类、订单、仪表盘
-  actions/               # Server Actions（auth/cart/orders/admin-*）
-  components/            # UI 组件
+    admin/               # 后台：仪表盘 + 分类管理
+      page.tsx           # 仪表盘
+      categories/        # 分类管理页面
+    api/auth/            # 注册/登录/当前用户/退出
+    api/products/        # 公开商品列表/详情 API
+    api/categories/      # 公开分类 API
+    api/admin/categories/ # 分类 CRUD Route Handlers
+  actions/               # Server Actions（auth.ts、cart.ts）
+  components/            # UI 组件（ShopShell、商品卡片、表单等）
   lib/
     prisma.ts            # PrismaClient 单例（server-only）
-    auth.ts              # Session、getCurrentUser、requireUser/Admin、safeNext
-    orders.ts            # 事务化下单/取消
-    constants.ts         # 角色、订单状态、状态流转、运费、分页
-    validation.ts        # Zod schema、yuanToCents
-    format.ts            # 金额/日期格式化
+    auth.ts              # 签名 Session、getCurrentUser、requireUser/Admin、safeNext
+    auth-service.ts      # 注册/登录共享逻辑（API 与 Server Actions 共用）
+    password.ts          # bcryptjs 哈希与校验
+    prisma-errors.ts     # P2002 等 Prisma 错误处理
+    products.ts          # 商品/分类查询（页面与公开 API 共用）
+    constants.ts         # 分页与运费常量
+    validation.ts        # Zod schema（分类、登录、注册共用）
+    url.ts               # 商品列表 URL 构建
+    format.ts            # 金额/日期格式化（固定 Asia/Shanghai 时区）
 ```
 
 ## 数据模型要点
 
 - `User`：`role` 为 `"USER"` / `"ADMIN"` 字符串。
-- `Session`：只存 token 的 SHA-256（`tokenHash`），Cookie 保存原始随机 token，有效期 7 天。
+- `Session`：数据模型保留，但当前认证使用签名 Cookie，不依赖该表。
 - `Product`：`price` 为**整数分**；`active` 表示上架状态；删除时历史订单依赖快照。
 - `CartItem`：`@@unique([userId, productId])`，仅登录用户。
 - `Order` / `OrderItem`：`status` 为字符串；订单项保存名称、价格、图片快照，商品删除后仍可查看历史订单。
@@ -90,17 +100,30 @@ PENDING --用户/管理员取消--> CANCELLED   （取消时回补库存）
 - 取消订单时在事务内改为 `CANCELLED` 并回补库存。
 - 事务成功后才调用 `redirect()`，不要放在会吞异常的 `try/catch` 中。
 
+**认证**：
+
+- 核心函数集中在 `src/lib/auth.ts`：`hashPassword`、`verifyPassword`、`setSession(userId, role)`、`getSession()`、`getCurrentUser()`、`clearSession()`。
+- 会话使用 HMAC-SHA256 签名的 httpOnly Cookie `mm_session`（7 天），签名密钥来自 `AUTH_SECRET`；Cookie 内含 `userId`、`role`、`exp`，篡改会失效。
+- `getCurrentUser()` 以数据库为准返回完整用户信息；`requireAdmin` 使用数据库中的 role。
+- Cookie 标志：`httpOnly`、`sameSite=lax`，生产环境 `secure`。
+- 密码使用 bcryptjs（cost 10）；登录失败统一返回“邮箱或密码错误”，避免账号枚举。
+- 退出登录清除 Cookie；签名 Cookie 为无状态会话，已泄露的 Cookie 在过期前仍有效，如需服务端强制下线应改用 Session 表。
+- 认证 API：`POST /api/auth/register`、`POST /api/auth/login`、`GET /api/auth/me`、`POST /api/auth/logout`。
+- `/login`、`/register` 页面通过 Server Actions 调用同一套函数；登录回跳参数必须经过 `safeNext()`。
+- 环境变量：`DATABASE_URL`、`AUTH_SECRET`（必须配置）。
+
 **权限**：
 
 - `requireUser(nextPath)`：未登录跳转 `/login?next=...`。
 - `requireAdmin()`：未登录跳登录；非管理员跳 `/`。
 - `app/admin/layout.tsx` 的保护只影响页面，**每个 Server Action 必须独立重新校验** `getCurrentUser()?.role === "ADMIN"`。
+- 后台 API 使用 `requireAdminApi()`：未登录返回 401 JSON，非管理员返回 403 JSON。
 - 用户查询订单必须同时限定 `{ id, userId }`，防止越权。
 - 登录回跳参数必须经过 `safeNext()`，只允许站内单斜杠路径，防开放重定向。
 
 ## 编码约定
 
-- 写操作全部用 **Server Actions**（文件首行 `"use server"`），不新增 REST API。
+- 前台写操作使用 **Server Actions**；后台 CRUD 使用 `/api/admin/*` Route Handlers（分类管理已按此实现）。
 - 普通校验失败返回 `{ ok: false, message, errors }`，不要抛异常；只有编程错误才抛。
 - 表单：`useActionState` 从 `react` 导入，`useFormStatus` 从 `react-dom` 导入。
 - 写操作后按需 `revalidatePath`；涉及 Header 登录态/购物车数量时调用 `revalidatePath("/", "layout")`。
@@ -120,6 +143,23 @@ PENDING --用户/管理员取消--> CANCELLED   （取消时回补库存）
 - 使用纯 JS 的 `bcryptjs`，不要换成需要原生编译的 `bcrypt`。
 - Next.js 16 存在破坏性变更；写代码前可查阅 `node_modules/next/dist/docs/` 与根目录 `AGENTS.md`。
 
+## 后台分类 CRUD
+
+- API：`/api/admin/categories`（GET 列表、POST 创建）、`/api/admin/categories/[id]`（GET、PUT、DELETE）。
+- 页面：`/admin/categories`。服务端读取初始数据，客户端组件通过 API 增删改并同步本地状态。
+- 校验：Zod（名称 1–50 字；slug 仅小写字母、数字、中划线）。
+- 错误：未登录 401、非管理员 403、校验失败 400、唯一冲突 409、分类下有商品时禁止删除并返回 409。
+- 相关文件：`src/app/api/admin/categories/`、`src/app/admin/categories/page.tsx`、`src/components/category-manager.tsx`、`src/lib/auth.ts`、`src/lib/validation.ts`。
+
+## 公开商品 API
+
+- `GET /api/products?search=&category=&page=` — 上架商品列表，每页 9 条，返回 `{ products, pagination }`。
+- `GET /api/products/[id]` — 商品详情（含分类）；不存在或已下架返回 404。
+- `GET /api/categories` — 分类列表及每个分类的上架商品数。
+- 页面 `/` 与 `/products/[id]` 都是 Server Component，直接通过 `src/lib/products.ts` 读取 Prisma；公开 API 与页面共用同一查询层。
+- 搜索使用原生 SQL `LIKE ... ESCAPE '!'`，`%`/`_`/`!` 会先转义为字面量；分页与计数都在 SQL 内完成，只回传当前页的 9 个 id；分页超出范围会自动收敛到最后一页。
+- 详情页“加入购物车”由 `src/actions/cart.ts` 的 `addToCartAction` 处理：未登录跳转 `/login?next=...`，数量不超过库存。
+
 ## 种子账号
 
 | 角色 | 邮箱 | 密码 |
@@ -127,7 +167,7 @@ PENDING --用户/管理员取消--> CANCELLED   （取消时回补库存）
 | 管理员 | `admin@minimall.test` | `Admin123456` |
 | 普通用户 | `user@minimall.test` | `User123456` |
 
-种子数据包含 4 个分类、12 个商品，可重复执行（全部使用 upsert）。
+运行 `npm run db:seed` 可重复写入 4 个分类、12 件商品与上述 2 个演示账号（全部使用 upsert）。账号可通过 `/login` 登录；管理员登录后可访问 `/admin`。
 
 ## 验证清单
 
