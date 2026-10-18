@@ -47,17 +47,19 @@ src/
     page.tsx             # 首页
     products/[id]/       # 商品详情、加入购物车
     login/ register/     # 认证页
-    cart/ checkout/      # 购物车、结算
+    cart/ checkout/      # 购物车、结算（含收货信息表单）
     orders/              # 用户订单列表/详情
     admin/               # 后台：仪表盘 + 分类管理
       page.tsx           # 仪表盘
       categories/        # 分类管理页面
     api/auth/            # 注册/登录/当前用户/退出
+    api/cart/            # 购物车 CRUD API
+    api/orders/          # 订单创建/列表/详情/支付/取消
     api/products/        # 公开商品列表/详情 API
     api/categories/      # 公开分类 API
     api/admin/categories/ # 分类 CRUD Route Handlers
   actions/               # Server Actions（auth.ts、cart.ts）
-  components/            # UI 组件（ShopShell、商品卡片、表单等）
+  components/            # UI 组件（ShopShell、商品卡片、购物车、结算、订单等）
   lib/
     prisma.ts            # PrismaClient 单例（server-only）
     auth.ts              # 签名 Session、getCurrentUser、requireUser/Admin、safeNext
@@ -65,8 +67,14 @@ src/
     password.ts          # bcryptjs 哈希与校验
     prisma-errors.ts     # P2002 等 Prisma 错误处理
     products.ts          # 商品/分类查询（页面与公开 API 共用）
-    constants.ts         # 分页与运费常量
-    validation.ts        # Zod schema（分类、登录、注册共用）
+    cart.ts              # 购物车领域逻辑（事务、库存、归属校验）
+    cart-types.ts        # 购物车共享类型（客户端安全）
+    cart-api.ts          # 购物车错误到 HTTP 响应的映射
+    orders.ts            # 订单领域逻辑（事务下单、支付、取消、库存回补）
+    order-api.ts         # 订单错误到 HTTP 响应的映射
+    request.ts           # JSON 请求体读取（空 body 视为 {}）
+    constants.ts         # 分页、运费、订单状态常量
+    validation.ts        # Zod schema（分类、登录、注册、购物车、订单共用）
     url.ts               # 商品列表 URL 构建
     format.ts            # 金额/日期格式化（固定 Asia/Shanghai 时区）
 ```
@@ -142,6 +150,27 @@ PENDING --用户/管理员取消--> CANCELLED   （取消时回补库存）
 - Prisma 需要 `serverExternalPackages: ["@prisma/client", "prisma"]`，且 `lib/prisma.ts` 加 `import "server-only"`。
 - 使用纯 JS 的 `bcryptjs`，不要换成需要原生编译的 `bcrypt`。
 - Next.js 16 存在破坏性变更；写代码前可查阅 `node_modules/next/dist/docs/` 与根目录 `AGENTS.md`。
+
+## 购物车
+
+- API：`GET /api/cart`、`POST /api/cart`、`PUT /api/cart/[id]`、`DELETE /api/cart/[id]`；全部需要登录，未登录返回 401。
+- `POST /api/cart` 若商品已在购物车中则累加数量；数量在事务中与库存一起校验，超库存时抛错并回滚。
+- `PUT /api/cart/[id]` 与 `DELETE /api/cart/[id]` 必须同时按 `id + userId` 校验归属，防止越权。
+- 页面 `/cart`：`requireUser("/cart")` 守卫，服务端读取初始购物车，客户端组件通过 API 调整数量或删除。
+- 合计只统计可购买项；下架或库存不足的商品会标记并排除出合计。
+- 商品详情的“加入购物车”与 API 共用 `src/lib/cart.ts`。
+- “提交订单”跳转 `/checkout`，填写收货信息后调用 `POST /api/orders` 创建订单。
+
+## 订单
+
+- API：`POST /api/orders`（从购物车创建）、`GET /api/orders`、`GET /api/orders/[id]`、`PUT /api/orders/[id]`。
+- `PUT` 空 body 或 `{ action: "pay" }` 执行模拟支付；`{ action: "cancel" }` 取消订单。
+- 创建订单在事务中完成：读取购物车 → 校验上架/库存 → 条件扣减库存 → 创建订单与商品快照 → 清空购物车；任一步失败整体回滚。
+- 库存不足返回 409，并携带 `items: [{ productId, name, requested, available }]` 指明具体商品。
+- 状态：`PENDING → PAID → SHIPPED → COMPLETED`；任意未取消状态可取消，取消时回补库存。
+- 支付只允许 `PENDING → PAID`；重复支付、重复取消返回 409。
+- 页面：`/orders`（订单列表）、`/orders/[id]`（明细、状态、模拟支付/取消按钮）、`/checkout`（收货信息 + 下单）。
+- 运费：满 ¥99 包邮，否则 ¥10；订单项保存名称、价格、图片快照。
 
 ## 后台分类 CRUD
 

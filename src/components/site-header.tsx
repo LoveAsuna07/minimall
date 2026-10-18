@@ -20,6 +20,14 @@ export async function SiteHeader() {
           <Link href="/" className="transition hover:text-zinc-900">
             全部商品
           </Link>
+          <Link href="/cart" className="transition hover:text-zinc-900">
+            购物车
+          </Link>
+          {user ? (
+            <Link href="/orders" className="transition hover:text-zinc-900">
+              我的订单
+            </Link>
+          ) : null}
 
           {user?.role === "ADMIN" ? (
             <Link href="/admin" className="transition hover:text-zinc-900">

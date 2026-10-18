@@ -63,3 +63,66 @@ export const registerFormSchema = registerInputSchema
 export type LoginInput = z.infer<typeof loginInputSchema>;
 export type RegisterInput = z.infer<typeof registerInputSchema>;
 export type RegisterFormInput = z.infer<typeof registerFormSchema>;
+
+// ---------- 购物车 ----------
+
+export const addCartItemSchema = z.object({
+  productId: z
+    .string({ required_error: "缺少商品信息" })
+    .min(1, "缺少商品信息"),
+  quantity: z
+    .number({ required_error: "请输入数量" })
+    .int("数量必须是整数")
+    .min(1, "数量至少为 1")
+    .max(999, "数量不能超过 999"),
+});
+
+export const updateCartItemSchema = z.object({
+  quantity: z
+    .number({ required_error: "请输入数量" })
+    .int("数量必须是整数")
+    .min(1, "数量至少为 1")
+    .max(999, "数量不能超过 999"),
+});
+
+export type AddCartItemInput = z.infer<typeof addCartItemSchema>;
+export type UpdateCartItemInput = z.infer<typeof updateCartItemSchema>;
+
+// ---------- 订单 ----------
+
+// 下单时可选收货信息；未提供时使用用户昵称与占位值
+export const createOrderSchema = z.object({
+  shipName: z
+    .string()
+    .trim()
+    .min(1, "请输入收货人姓名")
+    .max(50, "收货人姓名不能超过 50 个字符")
+    .optional(),
+  shipPhone: z
+    .string()
+    .trim()
+    .regex(/^1[3-9]\d{9}$/, "请输入有效的手机号")
+    .optional(),
+  shipAddress: z
+    .string()
+    .trim()
+    .min(5, "收货地址至少 5 个字符")
+    .max(200, "收货地址不能超过 200 个字符")
+    .optional(),
+});
+
+export const orderActionSchema = z
+  .object({
+    action: z.enum(["pay", "cancel"]).optional(),
+    status: z.enum(["PAID", "CANCELLED"]).optional(),
+  })
+  .refine(
+    (data) =>
+      !(data.action && data.status) ||
+      (data.action === "pay" && data.status === "PAID") ||
+      (data.action === "cancel" && data.status === "CANCELLED"),
+    { message: "操作与订单状态不匹配" },
+  );
+
+export type CreateOrderInput = z.infer<typeof createOrderSchema>;
+export type OrderActionInput = z.infer<typeof orderActionSchema>;

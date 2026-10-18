@@ -193,6 +193,17 @@ export async function requireAdmin(nextPath = "/admin"): Promise<SessionUser> {
   return user;
 }
 
+// API 级登录守卫：返回 JSON 错误响应而不是重定向
+export async function requireUserApi(): Promise<
+  { user: SessionUser } | { response: Response }
+> {
+  const user = await getCurrentUser();
+  if (!user) {
+    return { response: Response.json({ error: "未登录" }, { status: 401 }) };
+  }
+  return { user };
+}
+
 // API 级管理员守卫：返回 JSON 错误响应而不是重定向
 export async function requireAdminApi(): Promise<
   { user: SessionUser } | { response: Response }
