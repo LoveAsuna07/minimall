@@ -5,6 +5,9 @@ export const PRODUCT_PAGE_SIZE = 9;
 export const SHIPPING_FEE = 1000;
 export const FREE_SHIPPING_THRESHOLD = 9900;
 
+// 单个购物车商品数量上限
+export const MAX_CART_QUANTITY = 999;
+
 // 订单状态；数据库中是字符串，这里用联合类型约束
 export const ORDER_STATUSES = [
   "PENDING",

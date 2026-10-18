@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { logoutAction } from "@/actions/auth";
 import { getCurrentUser } from "@/lib/auth";
+import { getCartCount } from "@/lib/cart";
 
-// 站点通用顶栏：展示登录状态与后台入口
+// 站点通用顶栏：展示登录状态、购物车数量与后台入口
 export async function SiteHeader() {
   const user = await getCurrentUser();
+  const cartCount = user ? await getCartCount(user.id) : 0;
 
   return (
     <header className="border-b border-zinc-200 bg-white">
@@ -21,7 +23,7 @@ export async function SiteHeader() {
             全部商品
           </Link>
           <Link href="/cart" className="transition hover:text-zinc-900">
-            购物车
+            购物车{cartCount > 0 ? ` (${cartCount})` : ""}
           </Link>
           {user ? (
             <Link href="/orders" className="transition hover:text-zinc-900">

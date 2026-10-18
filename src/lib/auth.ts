@@ -2,6 +2,7 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 
 export const SESSION_COOKIE = "mm_session";
@@ -136,17 +137,20 @@ export async function getSession(): Promise<SessionInfo | null> {
 }
 
 // 获取当前用户的完整信息（以数据库为准）
-export async function getCurrentUser(): Promise<SessionUser | null> {
-  const session = await getSession();
-  if (!session) {
-    return null;
-  }
+// 用 cache() 做请求内去重：同一请求中页面守卫与 SiteHeader 只查询一次
+export const getCurrentUser = cache(
+  async (): Promise<SessionUser | null> => {
+    const session = await getSession();
+    if (!session) {
+      return null;
+    }
 
-  return prisma.user.findUnique({
-    where: { id: session.userId },
-    select: { id: true, email: true, name: true, role: true },
-  });
-}
+    return prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { id: true, email: true, name: true, role: true },
+    });
+  },
+);
 
 // 清除会话 Cookie
 export async function clearSession(): Promise<void> {

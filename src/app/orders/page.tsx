@@ -4,7 +4,7 @@ import { OrderStatusBadge } from "@/components/order-status-badge";
 import { ShopShell } from "@/components/shop-shell";
 import { requireUser } from "@/lib/auth";
 import { formatCents, formatDate } from "@/lib/format";
-import { getUserOrders } from "@/lib/orders";
+import { getUserOrders, sumOrderItemQuantity } from "@/lib/orders";
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +66,7 @@ export default async function OrdersPage() {
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="text-sm text-zinc-500">
-                      {order._count.items} 件商品
+                      {sumOrderItemQuantity(order.items)} 件商品
                     </span>
                     <span className="text-lg font-semibold text-zinc-900">
                       {formatCents(order.total)}

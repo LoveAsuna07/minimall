@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { ProductImage } from "@/components/product-image";
 import type { CartItemView, CartView } from "@/lib/cart-types";
@@ -11,6 +12,7 @@ type CartManagerProps = {
 };
 
 export function CartManager({ initialCart }: CartManagerProps) {
+  const router = useRouter();
   const [items, setItems] = useState<CartItemView[]>(initialCart.items);
   const [error, setError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -21,8 +23,14 @@ export function CartManager({ initialCart }: CartManagerProps) {
       item.available ? sum + item.product.price * item.quantity : sum,
     0,
   );
-  const count = items.reduce((sum, item) => sum + item.quantity, 0);
-  const canCheckout = items.some((item) => item.available);
+  // 件数与合计保持同一口径：只统计可购买项
+  const count = items.reduce(
+    (sum, item) => (item.available ? sum + item.quantity : sum),
+    0,
+  );
+  // 下单要求购物车中所有商品都可购买
+  const canCheckout =
+    items.length > 0 && items.every((item) => item.available);
 
   // 修改数量；库存与上架状态由服务端再次校验
   async function updateQuantity(item: CartItemView, nextQuantity: number) {
@@ -66,6 +74,8 @@ export function CartManager({ initialCart }: CartManagerProps) {
             : current,
         ),
       );
+      // 同步顶栏购物车角标
+      router.refresh();
     } catch {
       setError("网络错误，请稍后重试");
     } finally {
@@ -101,6 +111,8 @@ export function CartManager({ initialCart }: CartManagerProps) {
       setItems((previous) =>
         previous.filter((current) => current.id !== item.id),
       );
+      // 同步顶栏购物车角标
+      router.refresh();
     } catch {
       setError("网络错误，请稍后重试");
     } finally {
@@ -258,9 +270,14 @@ export function CartManager({ initialCart }: CartManagerProps) {
             提交订单
           </Link>
         ) : (
-          <span className="mt-5 flex h-11 cursor-not-allowed items-center justify-center rounded-xl bg-zinc-200 text-sm font-medium text-zinc-500">
-            提交订单
-          </span>
+          <>
+            <p className="mt-4 text-xs text-red-600">
+              部分商品已下架或库存不足，请先移除后再提交订单。
+            </p>
+            <span className="mt-2 flex h-11 cursor-not-allowed items-center justify-center rounded-xl bg-zinc-200 text-sm font-medium text-zinc-500">
+              提交订单
+            </span>
+          </>
         )}
 
         <Link

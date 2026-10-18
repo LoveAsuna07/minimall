@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireUserApi } from "@/lib/auth";
 import { addCartItem, getCart } from "@/lib/cart";
 import { cartErrorResponse } from "@/lib/cart-api";
+import { readJsonBody } from "@/lib/request";
 import { addCartItemSchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
@@ -24,14 +25,15 @@ export async function POST(request: Request) {
     return auth.response;
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "请求体必须是合法的 JSON" }, { status: 400 });
+  const json = await readJsonBody(request);
+  if (!json.ok) {
+    return NextResponse.json(
+      { error: "请求体必须是合法的 JSON" },
+      { status: 400 },
+    );
   }
 
-  const parsed = addCartItemSchema.safeParse(body);
+  const parsed = addCartItemSchema.safeParse(json.body);
   if (!parsed.success) {
     return NextResponse.json(
       {

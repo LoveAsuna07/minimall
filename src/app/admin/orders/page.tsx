@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { AdminOrderManager } from "@/components/admin-order-manager";
-import { getAllOrders } from "@/lib/orders";
+import { getAllOrders, sumOrderItemQuantity } from "@/lib/orders";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,7 @@ export default async function AdminOrdersPage() {
     total: order.total,
     status: order.status,
     createdAt: order.createdAt.toISOString(),
-    itemCount: order._count.items,
+    itemCount: sumOrderItemQuantity(order.items),
     userName: order.user.name,
     userEmail: order.user.email,
   }));

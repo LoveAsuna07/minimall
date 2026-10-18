@@ -23,7 +23,7 @@ export default async function CartPage() {
             购物车
           </h1>
           <p className="mt-1 text-sm text-zinc-500">
-            共 {cart.count} 件商品
+            调整数量后即可提交订单，满 ¥99 包邮。
           </p>
         </div>
 

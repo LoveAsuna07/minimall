@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import type { CartActionState } from "@/lib/action-state";
 import { requireUser } from "@/lib/auth";
 import { addCartItem, CartOperationError } from "@/lib/cart";
@@ -21,6 +22,8 @@ export async function addToCartAction(
 
   try {
     await addCartItem(user.id, productId, 1);
+    // Header 中的购物车数量需要同步刷新
+    revalidatePath("/", "layout");
     return { ok: true, message: "已加入购物车" };
   } catch (error) {
     if (error instanceof CartOperationError) {

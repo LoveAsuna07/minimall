@@ -5,6 +5,7 @@ import {
   uniqueCategoryErrorMessage,
 } from "@/lib/prisma-errors";
 import { prisma } from "@/lib/prisma";
+import { readJsonBody } from "@/lib/request";
 import { categoryInputSchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
@@ -31,14 +32,15 @@ export async function POST(request: Request) {
     return auth.response;
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "请求体必须是合法的 JSON" }, { status: 400 });
+  const json = await readJsonBody(request);
+  if (!json.ok) {
+    return NextResponse.json(
+      { error: "请求体必须是合法的 JSON" },
+      { status: 400 },
+    );
   }
 
-  const parsed = categoryInputSchema.safeParse(body);
+  const parsed = categoryInputSchema.safeParse(json.body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "输入校验失败", fieldErrors: parsed.error.flatten().fieldErrors },

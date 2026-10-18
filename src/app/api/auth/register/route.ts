@@ -2,20 +2,22 @@ import { NextResponse } from "next/server";
 import { setSession } from "@/lib/auth";
 import { createUser } from "@/lib/auth-service";
 import { isUniqueConstraintError } from "@/lib/prisma-errors";
+import { readJsonBody } from "@/lib/request";
 import { registerInputSchema } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
 // POST /api/auth/register
 export async function POST(request: Request) {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "请求体必须是合法的 JSON" }, { status: 400 });
+  const json = await readJsonBody(request);
+  if (!json.ok) {
+    return NextResponse.json(
+      { error: "请求体必须是合法的 JSON" },
+      { status: 400 },
+    );
   }
 
-  const parsed = registerInputSchema.safeParse(body);
+  const parsed = registerInputSchema.safeParse(json.body);
   if (!parsed.success) {
     return NextResponse.json(
       {

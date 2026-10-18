@@ -1,5 +1,6 @@
 import "server-only";
 import type { CartItemView, CartProduct, CartView } from "@/lib/cart-types";
+import { MAX_CART_QUANTITY } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
 
 const cartProductSelect = {
@@ -21,7 +22,8 @@ export type CartErrorCode =
   | "PRODUCT_NOT_FOUND"
   | "PRODUCT_INACTIVE"
   | "ITEM_NOT_FOUND"
-  | "INSUFFICIENT_STOCK";
+  | "INSUFFICIENT_STOCK"
+  | "QUANTITY_LIMIT";
 
 export class CartOperationError extends Error {
   constructor(
@@ -61,8 +63,21 @@ export async function getCart(userId: string): Promise<CartView> {
         item.available ? sum + item.product.price * item.quantity : sum,
       0,
     ),
-    count: views.reduce((sum, item) => sum + item.quantity, 0),
+    // 件数与合计保持同一口径：只统计可购买项
+    count: views.reduce(
+      (sum, item) => (item.available ? sum + item.quantity : sum),
+      0,
+    ),
   };
+}
+
+// 顶栏购物车角标：统计购物车内所有商品数量
+export async function getCartCount(userId: string): Promise<number> {
+  const result = await prisma.cartItem.aggregate({
+    where: { userId },
+    _sum: { quantity: true },
+  });
+  return result._sum.quantity ?? 0;
 }
 
 // 加入购物车：事务内校验库存，超出时抛错并回滚
@@ -91,6 +106,13 @@ export async function addCartItem(
         update: { quantity: { increment: quantity } },
         include: { product: { select: cartProductSelect } },
       });
+
+      if (item.quantity > MAX_CART_QUANTITY) {
+        throw new CartOperationError(
+          "QUANTITY_LIMIT",
+          `单件商品数量不能超过 ${MAX_CART_QUANTITY} 件`,
+        );
+      }
 
       if (item.quantity > product.stock) {
         throw new CartOperationError(
@@ -125,6 +147,13 @@ export async function updateCartItemQuantity(
 
       if (!item.product.active) {
         throw new CartOperationError("PRODUCT_INACTIVE", "商品已下架");
+      }
+
+      if (quantity > MAX_CART_QUANTITY) {
+        throw new CartOperationError(
+          "QUANTITY_LIMIT",
+          `单件商品数量不能超过 ${MAX_CART_QUANTITY} 件`,
+        );
       }
 
       if (quantity > item.product.stock) {

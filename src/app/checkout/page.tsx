@@ -14,6 +14,8 @@ export const metadata: Metadata = {
 export default async function CheckoutPage() {
   const user = await requireUser("/checkout");
   const cart = await getCart(user.id);
+  // 下单要求购物车中所有商品都可购买
+  const hasUnavailable = cart.items.some((item) => !item.available);
 
   return (
     <ShopShell>
@@ -38,6 +40,21 @@ export default async function CheckoutPage() {
               className="mt-4 inline-block rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white transition hover:bg-emerald-700"
             >
               去逛逛
+            </Link>
+          </div>
+        ) : hasUnavailable ? (
+          <div className="rounded-2xl border border-dashed border-amber-300 bg-white px-6 py-16 text-center">
+            <p className="text-lg font-medium text-zinc-900">
+              部分商品已下架或库存不足
+            </p>
+            <p className="mt-1 text-sm text-zinc-500">
+              请先返回购物车移除这些商品后再提交订单。
+            </p>
+            <Link
+              href="/cart"
+              className="mt-4 inline-block rounded-lg bg-emerald-600 px-4 py-2 text-sm text-white transition hover:bg-emerald-700"
+            >
+              返回购物车
             </Link>
           </div>
         ) : (

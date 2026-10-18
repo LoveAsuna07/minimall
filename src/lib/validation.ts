@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MAX_CART_QUANTITY } from "@/lib/constants";
 
 // 分类 slug：小写字母、数字与中划线，不能以中划线开头或结尾
 export const CATEGORY_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -74,7 +75,7 @@ export const addCartItemSchema = z.object({
     .number({ required_error: "请输入数量" })
     .int("数量必须是整数")
     .min(1, "数量至少为 1")
-    .max(999, "数量不能超过 999"),
+    .max(MAX_CART_QUANTITY, `数量不能超过 ${MAX_CART_QUANTITY}`),
 });
 
 export const updateCartItemSchema = z.object({
@@ -82,7 +83,7 @@ export const updateCartItemSchema = z.object({
     .number({ required_error: "请输入数量" })
     .int("数量必须是整数")
     .min(1, "数量至少为 1")
-    .max(999, "数量不能超过 999"),
+    .max(MAX_CART_QUANTITY, `数量不能超过 ${MAX_CART_QUANTITY}`),
 });
 
 export type AddCartItemInput = z.infer<typeof addCartItemSchema>;

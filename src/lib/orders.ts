@@ -180,24 +180,31 @@ export async function createOrderFromCart(
   );
 }
 
-// 后台订单列表
+// 后台订单列表；items 只取 quantity 用于统计商品件数
 export async function getAllOrders() {
   return prisma.order.findMany({
     orderBy: { createdAt: "desc" },
     include: {
       user: { select: { name: true, email: true } },
-      _count: { select: { items: true } },
+      items: { select: { quantity: true } },
     },
   });
 }
 
-// 我的订单列表
+// 我的订单列表；items 只取 quantity 用于统计商品件数
 export async function getUserOrders(userId: string) {
   return prisma.order.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
-    include: { _count: { select: { items: true } } },
+    include: { items: { select: { quantity: true } } },
   });
+}
+
+// 订单商品总件数（订单行数量之和，而非行数）
+export function sumOrderItemQuantity(
+  items: Array<{ quantity: number }>,
+): number {
+  return items.reduce((sum, item) => sum + item.quantity, 0);
 }
 
 // 订单详情；按 id + userId 查询，防止越权
