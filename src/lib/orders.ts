@@ -1,7 +1,12 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import type { Prisma } from "@prisma/client";
-import { FREE_SHIPPING_THRESHOLD, SHIPPING_FEE } from "@/lib/constants";
+import {
+  ADMIN_ORDER_TRANSITIONS,
+  FREE_SHIPPING_THRESHOLD,
+  SHIPPING_FEE,
+  isOrderStatus,
+} from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
 
 export type OrderWithItems = Prisma.OrderGetPayload<{
@@ -175,6 +180,17 @@ export async function createOrderFromCart(
   );
 }
 
+// 后台订单列表
+export async function getAllOrders() {
+  return prisma.order.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      user: { select: { name: true, email: true } },
+      _count: { select: { items: true } },
+    },
+  });
+}
+
 // 我的订单列表
 export async function getUserOrders(userId: string) {
   return prisma.order.findMany({
@@ -228,6 +244,63 @@ export async function payOrder(
 
     const updated = await tx.order.findFirst({
       where: { id: orderId, userId },
+      include: { items: true },
+    });
+
+    if (!updated) {
+      throw new OrderOperationError("ORDER_NOT_FOUND", "订单不存在");
+    }
+    return updated;
+  });
+}
+
+// 后台更新订单状态；按 ADMIN_ORDER_TRANSITIONS 校验流转
+export async function adminUpdateOrderStatus(
+  orderId: string,
+  target: string,
+): Promise<OrderWithItems> {
+  return prisma.$transaction(async (tx) => {
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+
+    if (!order) {
+      throw new OrderOperationError("ORDER_NOT_FOUND", "订单不存在");
+    }
+
+    if (!isOrderStatus(order.status) || !isOrderStatus(target)) {
+      throw new OrderOperationError("INVALID_STATUS", "订单状态无效");
+    }
+
+    const allowed = ADMIN_ORDER_TRANSITIONS[order.status];
+    if (!allowed.includes(target)) {
+      throw new OrderOperationError(
+        "INVALID_STATUS",
+        "当前订单状态不可变更为该状态",
+      );
+    }
+
+    const data: Prisma.OrderUpdateInput = { status: target };
+    if (target === "PAID" && !order.paidAt) {
+      data.paidAt = new Date();
+    }
+
+    await tx.order.update({ where: { id: order.id }, data });
+
+    if (target === "CANCELLED") {
+      for (const item of order.items) {
+        if (item.productId) {
+          await tx.product.updateMany({
+            where: { id: item.productId },
+            data: { stock: { increment: item.quantity } },
+          });
+        }
+      }
+    }
+
+    const updated = await tx.order.findUnique({
+      where: { id: order.id },
       include: { items: true },
     });
 

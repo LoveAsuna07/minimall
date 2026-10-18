@@ -49,14 +49,18 @@ src/
     login/ register/     # 认证页
     cart/ checkout/      # 购物车、结算（含收货信息表单）
     orders/              # 用户订单列表/详情
-    admin/               # 后台：仪表盘 + 分类管理
+    admin/               # 后台：仪表盘 + 商品/订单/分类管理
       page.tsx           # 仪表盘
+      products/          # 商品管理页面
+      orders/            # 订单管理页面
       categories/        # 分类管理页面
     api/auth/            # 注册/登录/当前用户/退出
     api/cart/            # 购物车 CRUD API
     api/orders/          # 订单创建/列表/详情/支付/取消
     api/products/        # 公开商品列表/详情 API
     api/categories/      # 公开分类 API
+    api/admin/products/  # 后台商品 CRUD
+    api/admin/orders/    # 后台订单列表与状态流转
     api/admin/categories/ # 分类 CRUD Route Handlers
   actions/               # Server Actions（auth.ts、cart.ts）
   components/            # UI 组件（ShopShell、商品卡片、购物车、结算、订单等）
@@ -73,10 +77,10 @@ src/
     orders.ts            # 订单领域逻辑（事务下单、支付、取消、库存回补）
     order-api.ts         # 订单错误到 HTTP 响应的映射
     request.ts           # JSON 请求体读取（空 body 视为 {}）
-    constants.ts         # 分页、运费、订单状态常量
-    validation.ts        # Zod schema（分类、登录、注册、购物车、订单共用）
+    constants.ts         # 分页、运费、订单状态与后台流转规则
+    validation.ts        # Zod schema（分类、登录、注册、购物车、订单、商品共用）
     url.ts               # 商品列表 URL 构建
-    format.ts            # 金额/日期格式化（固定 Asia/Shanghai 时区）
+    format.ts            # 金额/日期格式化、元分转换（固定 Asia/Shanghai 时区）
 ```
 
 ## 数据模型要点
@@ -171,6 +175,14 @@ PENDING --用户/管理员取消--> CANCELLED   （取消时回补库存）
 - 支付只允许 `PENDING → PAID`；重复支付、重复取消返回 409。
 - 页面：`/orders`（订单列表）、`/orders/[id]`（明细、状态、模拟支付/取消按钮）、`/checkout`（收货信息 + 下单）。
 - 运费：满 ¥99 包邮，否则 ¥10；订单项保存名称、价格、图片快照。
+
+## 后台管理
+
+- 所有 `/admin/**` 页面由 `src/app/admin/layout.tsx` 的 `requireAdmin` 保护；所有 `/api/admin/**` 使用 `requireAdminApi`：未登录 401，非管理员 403。
+- 商品：`GET/POST /api/admin/products`、`GET/PUT/DELETE /api/admin/products/[id]`。价格以**整数分**存储，后台表单以元输入并通过 `yuanToCents` 转换；图片必须是 http/https URL；分类必须存在。
+- 订单：`GET /api/admin/orders`；`PUT /api/admin/orders/[id]` 接收 `{ status: "PAID" | "SHIPPED" | "COMPLETED" | "CANCELLED" }`，按 `ADMIN_ORDER_TRANSITIONS` 校验流转；取消订单会回补库存。
+- 页面：`/admin/products`（表格 + 新增/编辑表单）、`/admin/orders`（表格 + 状态流转按钮）、`/admin/categories`（列表 + 新增/编辑表单）。
+- 删除商品为硬删除：购物车项级联删除，历史订单项保留名称/价格/图片快照。
 
 ## 后台分类 CRUD
 

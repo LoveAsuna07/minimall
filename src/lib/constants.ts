@@ -36,3 +36,12 @@ export const ORDER_STATUS_CLASSES: Record<OrderStatus, string> = {
 export function isOrderStatus(value: string): value is OrderStatus {
   return (ORDER_STATUSES as readonly string[]).includes(value);
 }
+
+// 后台可执行的订单状态流转；取消可从任意未取消状态发起
+export const ADMIN_ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  PENDING: ["PAID", "CANCELLED"],
+  PAID: ["SHIPPED", "CANCELLED"],
+  SHIPPED: ["COMPLETED", "CANCELLED"],
+  COMPLETED: ["CANCELLED"],
+  CANCELLED: [],
+};

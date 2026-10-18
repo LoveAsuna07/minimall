@@ -19,6 +19,12 @@ export default async function AdminLayout({ children }: { children: ReactNode })
               <Link href="/admin" className="transition-colors hover:text-zinc-900">
                 仪表盘
               </Link>
+              <Link href="/admin/products" className="transition-colors hover:text-zinc-900">
+                商品管理
+              </Link>
+              <Link href="/admin/orders" className="transition-colors hover:text-zinc-900">
+                订单管理
+              </Link>
               <Link href="/admin/categories" className="transition-colors hover:text-zinc-900">
                 分类管理
               </Link>

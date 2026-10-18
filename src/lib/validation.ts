@@ -126,3 +126,57 @@ export const orderActionSchema = z
 
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type OrderActionInput = z.infer<typeof orderActionSchema>;
+
+// ---------- 后台商品 ----------
+
+const httpImageUrlSchema = z
+  .string({ required_error: "请输入图片 URL" })
+  .trim()
+  .url("请输入有效的图片 URL")
+  .refine((value) => {
+    try {
+      const url = new URL(value);
+      return url.protocol === "http:" || url.protocol === "https:";
+    } catch {
+      return false;
+    }
+  }, "图片 URL 必须以 http:// 或 https:// 开头");
+
+export const productInputSchema = z.object({
+  name: z
+    .string({ required_error: "请输入商品名称" })
+    .trim()
+    .min(1, "请输入商品名称")
+    .max(100, "商品名称不能超过 100 个字符"),
+  description: z
+    .string()
+    .trim()
+    .max(5000, "商品描述不能超过 5000 个字符")
+    .optional()
+    .default(""),
+  price: z
+    .number({ required_error: "请输入价格" })
+    .int("价格必须以分为单位")
+    .min(0, "价格不能为负数")
+    .max(99_999_999, "价格超出范围"),
+  imageUrl: httpImageUrlSchema,
+  stock: z
+    .number({ required_error: "请输入库存" })
+    .int("库存必须是整数")
+    .min(0, "库存不能为负数")
+    .max(999_999, "库存超出范围"),
+  categoryId: z
+    .string({ required_error: "请选择分类" })
+    .min(1, "请选择分类"),
+  active: z.boolean().optional().default(true),
+});
+
+export type ProductInput = z.infer<typeof productInputSchema>;
+
+// ---------- 后台订单 ----------
+
+export const adminOrderStatusSchema = z.object({
+  status: z.enum(["PAID", "SHIPPED", "COMPLETED", "CANCELLED"]),
+});
+
+export type AdminOrderStatusInput = z.infer<typeof adminOrderStatusSchema>;

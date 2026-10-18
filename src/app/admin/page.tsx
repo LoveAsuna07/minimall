@@ -67,15 +67,25 @@ export default async function AdminDashboardPage() {
           </p>
         </Link>
 
-        <div className="rounded-xl border border-dashed border-zinc-200 bg-white/60 p-5">
-          <h2 className="font-medium text-zinc-400">商品管理</h2>
-          <p className="mt-1 text-sm text-zinc-400">待后续实现。</p>
-        </div>
+        <Link
+          href="/admin/products"
+          className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-emerald-300 hover:shadow-md"
+        >
+          <h2 className="font-medium text-zinc-900">商品管理</h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            新增、编辑和删除商品。
+          </p>
+        </Link>
 
-        <div className="rounded-xl border border-dashed border-zinc-200 bg-white/60 p-5">
-          <h2 className="font-medium text-zinc-400">订单管理</h2>
-          <p className="mt-1 text-sm text-zinc-400">待后续实现。</p>
-        </div>
+        <Link
+          href="/admin/orders"
+          className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition hover:border-emerald-300 hover:shadow-md"
+        >
+          <h2 className="font-medium text-zinc-900">订单管理</h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            查看全部订单并推进状态。
+          </p>
+        </Link>
       </div>
     </div>
   );
